@@ -1,0 +1,95 @@
+import /microtrust.rc
+
+on init
+    # Create a more standard /dev/block layout for our scripts
+    symlink /dev/block/platform/bootdevice /dev/block/bootdevice
+    mkdir /mnt/vendor/persist 0700 root root
+    mount ext4 /dev/block/platform/bootdevice/by-name/persist /mnt/vendor/persist
+    export LD_LIBRARY_PATH /system/lib64:/vendor/lib64:/vendor/lib64/hw
+
+on fs
+    install_keyring
+
+on fs
+    start hwservicemanager
+    start servicemanager
+
+on boot
+    start health-hal-2-1
+    start vendor.vibrator-default
+    setprop sys.usb.config adb
+
+service keystore_auth /system/bin/keystore_auth
+    oneshot
+    user system
+    group root
+    disabled
+    seclabel u:r:recovery:s0
+
+service gatekeeper-1-0 /vendor/bin/hw/android.hardware.gatekeeper@1.0-service
+    user root
+    group root
+    disabled
+    seclabel u:r:recovery:s0
+
+service keymaster-4-1 /vendor/bin/hw/android.hardware.keymaster@4.1-service.beanpod
+    user root
+    group root drmrpc
+    disabled
+    seclabel u:r:recovery:s0
+
+service teei_daemon /vendor/bin/teei_daemon
+    user root
+    group root
+    disabled
+    seclabel u:r:recovery:s0
+
+service vendor.vibrator-default /vendor/bin/hw/android.hardware.vibrator-service.mediatek
+    class hal
+    user root
+    group root
+    disabled
+    seclabel u:r:recovery:s0
+
+on property:hwservicemanager.ready=true
+    start keymaster-4-1
+    start gatekeeper-1-0
+
+on property:ro.crypto.state=unsupported
+    stop teei_daemon
+    stop keymaster-4-1
+    stop gatekeeper-1-0
+    stop servicemanager
+    stop hwservicemanager
+
+on property:ro.crypto.state=unencrypted
+    stop teei_daemon
+    stop keymaster-4-1
+    stop gatekeeper-1-0
+    stop servicemanager
+    stop hwservicemanager
+
+on property:twrp.decrypt.done=true && property:twrp.all.users.decrypted=true
+    stop teei_daemon
+    stop keymaster-4-1
+    stop gatekeeper-1-0
+    stop servicemanager
+    stop hwservicemanager
+
+on property:recovery.perf.mode=1
+    write /sys/devices/system/cpu/cpu1/online 1
+    write /sys/devices/system/cpu/cpu2/online 1
+    write /sys/devices/system/cpu/cpu3/online 1
+    write /sys/devices/system/cpu/cpu4/online 1
+    write /sys/devices/system/cpu/cpu5/online 1
+    write /sys/devices/system/cpu/cpu6/online 1
+    write /sys/devices/system/cpu/cpu7/online 1
+
+on property:recovery.perf.mode=0
+    write /sys/devices/system/cpu/cpu1/online 0
+    write /sys/devices/system/cpu/cpu2/online 1
+    write /sys/devices/system/cpu/cpu3/online 0
+    write /sys/devices/system/cpu/cpu4/online 1
+    write /sys/devices/system/cpu/cpu5/online 0
+    write /sys/devices/system/cpu/cpu6/online 1
+    write /sys/devices/system/cpu/cpu7/online 0
